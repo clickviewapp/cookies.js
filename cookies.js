@@ -24,11 +24,12 @@
 |*|
 \*/
 
-(function () {
-
+(function (useSameSiteNone) {
+	
 	function makeSetterString (sKey, sValue, vEnd, sPath, sDomain, bSecure, vSameSite) {
 
 		var sExpires = "";
+		var sameSiteNone = useSameSiteNone ? "; samesite=none" : "";
 
 		if (vEnd) {
 
@@ -63,7 +64,7 @@
 
 		}
 
-		return	encodeURIComponent(sKey) + "=" + encodeURIComponent(sValue) + sExpires + (sDomain ? "; domain=" + sDomain : "") + (sPath ? "; path=" + sPath : "") + (bSecure ? "; secure" : "") + (!vSameSite || vSameSite.toString().toLowerCase() === "no_restriction" || vSameSite < 0 ? "" : vSameSite.toString().toLowerCase() === "lax" || Math.ceil(vSameSite) === 1 || vSameSite === true ? "; samesite=lax" : "; samesite=strict");
+		return	encodeURIComponent(sKey) + "=" + encodeURIComponent(sValue) + sExpires + (sDomain ? "; domain=" + sDomain : "") + (sPath ? "; path=" + sPath : "") + (bSecure ? "; secure" : "") + (!vSameSite || vSameSite.toString().toLowerCase() === "no_restriction" || vSameSite < 0 ? sameSiteNone : vSameSite.toString().toLowerCase() === "lax" || Math.ceil(vSameSite) === 1 || vSameSite === true ? "; samesite=lax" : "; samesite=strict");
 
 	}
 
@@ -130,7 +131,120 @@
 
 	};
 
-})();
+})((function () {
+	return !isSameSiteNoneIncompatible ();
+
+	function isSameSiteNoneIncompatible (useragent) {
+
+		return hasWebKitSameSiteBug(useragent) || dropsUnrecognizedSameSiteCookies(useragent);
+
+	}
+
+	function hasWebKitSameSiteBug (useragent) {
+
+		if (isIosVersion(useragent)) return true;
+
+		if (!isMacosxVersion(10, 14, useragent)) return false;
+
+		return isSafari(useragent) || isMacEmbeddedBrowser(useragent);
+
+	}
+
+	function dropsUnrecognizedSameSiteCookies (useragent) {
+
+		if (isUcBrowser(useragent))
+
+			return !isUcBrowserVersionAtLeast(12, 13, 2, useragent);
+
+		return isChromiumBased(useragent) && isChromiumVersionAtLeast(51, useragent) && !isChromiumVersionAtLeast(67, useragent);
+
+	}
+
+	function isIosVersion (major, useragent) {
+
+		var regex = /\(iP.+; CPU .*OS (\d+)[_\d]*.*\) AppleWebKit\//;
+
+		return useragent.matches(regex)[0] == major;
+
+	}
+
+	function isMacosxVersion (major, minor, useragent) {
+
+		var regex = /\(Macintosh;.*Mac OS X (\d+)_(\d+)[_\d]*.*\) AppleWebKit\//;
+
+		var matches = useragent.matches(regex);
+
+		return matches[0] == major && matches[1] == minor;
+
+	}
+
+	function isSafari (useragent) {
+
+		var regex = /Version\/.* Safari\//
+
+		return useragent.test(regex) && !isChromiumBased(useragent);
+
+	}
+
+	function isMacEmbeddedBrowser (useragent) {
+
+		var regex = /^Mozilla\/[\.\d]+ \(Macintosh;.*Mac OS X [_\d]+\) AppleWebKit\/[\.\d]+ \(KHTML, like Gecko\)$/
+
+		return useragent.test(regex);
+
+	}
+
+	function isChromiumBased (useragent) {
+
+		var regex = /Chrom(e|ium)/;
+
+		return useragent.test(regex);
+
+	}
+
+	function isChromiumVersionAtLeast (major, useragent) {
+
+		var regex = /Chrom[^ \/]+\/(\d+)[\.\d]* /;
+
+		var version = +useragent.matches(regex)[0];
+
+		return version >= major;
+
+	}
+
+	function isUcBrowser (useragent) {
+
+		var regex = /UCBrowser\//;
+
+		return useragent.test(regex);
+
+	}
+
+	function isUcBrowserVersionAtLeast (major, minor, build, useragent) {
+
+		var regex = /UCBrowser\/(\d+)\.(\d+)\.(\d+)[\.\d]*/;
+
+		var matches = useragent.match(regex);
+
+		// // Extract digits from three capturing groups.
+		var majorVersion = +matches[0];
+		var minorVersion = +matches[0];
+		var buildVersion = +matches[0];
+
+		if (majorVersion !== major) 
+
+			return majorVersion > major;
+
+		if (minorVersion != minor)
+
+			return minorVersion > minor;
+
+		return buildVersion >= build;
+
+	}
+
+	
+})(window.navigator.userAgent));
 
 if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
 
